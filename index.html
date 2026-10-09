@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050a1f">
+<title>VEERB</title>
+<style>
+:root{--bg:#060b20;--tx:#f2f4ff;--mu:#9aa5cc;--bd:#1c2757;--sf:#0f1738;--bl:#5a52f0;padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+.w{max-width:520px;margin:auto}.pad{padding:12px}.mu{color:var(--mu);font-size:13px}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--bd);border-radius:10px;background:var(--sf);color:var(--tx);font:inherit;margin-top:8px}
+button{background:var(--bl);color:#fff;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600}
+button.s{background:var(--sf);color:var(--tx);border:1px solid var(--bd)}button.g{background:linear-gradient(90deg,#2c7bff,#7a3fe0,#d92fd0)}
+button.ib{background:none;border:0;font-size:22px;padding:4px 8px}
+.top{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;gap:8px;z-index:5}
+.logo{font-weight:800;letter-spacing:2px;background:linear-gradient(90deg,#2c7bff,#7a3fe0,#d92fd0);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:20px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;border:0;border-radius:0;font-size:22px;padding:12px 0;color:var(--mu)}nav button.on{color:#fff}
+.po{border-bottom:1px solid var(--bd);padding-bottom:8px}.ph{display:flex;gap:8px;align-items:center;padding:10px 12px}
+.tag{margin-left:auto;background:var(--sf);border-radius:8px;padding:1px 8px;font-size:11px;color:var(--mu)}
+.mi,video{width:100%;display:block;background:#000;max-height:520px;object-fit:cover}.tx{padding:2px 12px;font-size:14px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bd)}.li .g{flex:1}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2c7bff,#d92fd0);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.msg{max-width:78%;padding:8px 12px;border-radius:18px;margin:4px 0;font-size:14px;background:var(--sf)}.me{background:var(--bl);margin-left:auto}
+.bar{height:8px;background:var(--bd);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:#2c7bff}
+.note{background:var(--sf);border-radius:10px;padding:10px;font-size:13px;color:var(--mu);margin:10px 0}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="w" id="app"></div><nav id="nav" style="display:none"></nav><div id="ld"></div>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import{getFirestore,doc,setDoc,getDoc,addDoc,updateDoc,deleteDoc,collection,query,orderBy,limit,where,onSnapshot,serverTimestamp,arrayUnion,arrayRemove}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+/* ===== 1. PASTE YOUR FIREBASE CONFIG HERE (Project settings > Your apps > Web app) ===== */
+const CFG={apiKey:"AIzaSyCydzCUPFGGRmmddY0ldpAZaZdMfIJ-Jyk",authDomain:"veerbweeb.firebaseapp.com",projectId:"veerbweeb",storageBucket:"veerbweeb.firebasestorage.app",messagingSenderId:"750416401442",appId:"1:750416401442:web:9675baa6d040f950ac267b"};
+/* ===== 2. OPTIONAL, for free video uploads: cloudinary.com > Settings > Upload > unsigned preset ===== */
+const CLOUD={name:"",preset:""};
+
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TY={video:'Reel / Video',movie:'Movie',drama:'Drama',pic:'Picture'},NEED=2000;
+let auth,db,me=null,prof={},tab='home',posts=[],users=[],rIn=[],rOut=[],nfol=0,peer=null,msgs=[],unChat=null,openC={},cmts={},unC={},subs=[],dirty=false,mode='in';
+const FOC=new URLSearchParams(location.search).get('post');
+const LG=z=>`<svg width="${z}" height="${z}" viewBox="0 0 120 120"><defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2cb0ff"/><stop offset="1" stop-color="#5a52f0"/></linearGradient><linearGradient id="b" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7a3fe0"/><stop offset="1" stop-color="#e02fd0"/></linearGradient></defs><path d="M12 12L38 12L66 92L54 106Z" fill="url(#a)" stroke="url(#a)" stroke-width="7" stroke-linejoin="round"/><path d="M62 106L112 8L84 20Q76 24 72 34L58 92Z" fill="url(#b)" stroke="url(#b)" stroke-width="4" stroke-linejoin="round"/></svg>`;
+
+const RF=()=>{dirty=false;render()};
+function R(){const a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)&&me){dirty=true;return}dirty=false;render()}
+addEventListener('focusout',()=>{if(dirty)setTimeout(()=>{if(!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||''))R()},150)});
+function load(p,t){const d=$('ld');if(p<0){d.innerHTML='';return}d.innerHTML=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:30;display:flex;align-items:center;justify-content:center"><div style="background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:20px;width:270px;text-align:center"><div style="margin:0 auto 12px;width:38px;height:38px;border:4px solid var(--bd);border-top-color:#7a3fe0;border-radius:50%;animation:sp 1s linear infinite"></div><b>${esc(t||'Uploading...')}</b><div class="bar" style="margin:12px 0 4px"><i style="width:${p}%"></i></div><div class="mu">${p}%</div></div></div>`}
+
+/* ---------- auth ---------- */
+async function google(){try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){alert(e.message)}}
+async function emailGo(up){const e=$('em').value.trim(),p=$('pw').value;if(!e||p.length<6)return alert('Enter your email and a password of 6+ characters');try{up?await createUserWithEmailAndPassword(auth,e,p):await signInWithEmailAndPassword(auth,e,p)}catch(x){alert(x.message)}}
+async function enter(u){me=u;const ref=doc(db,'users',u.uid);let s=await getDoc(ref);
+ if(!s.exists()){await setDoc(ref,{uid:u.uid,name:u.displayName||(u.email||'user').split('@')[0],email:u.email||'',following:[],ts:serverTimestamp()});s=await getDoc(ref)}
+ prof=s.data();
+ subs=[onSnapshot(ref,d=>{prof=d.data()||prof;R()}),
+  onSnapshot(query(collection(db,'posts'),orderBy('ts','desc'),limit(40)),q=>{posts=q.docs.map(d=>({id:d.id,...d.data()}));R()}),
+  onSnapshot(query(collection(db,'users'),limit(60)),q=>{users=q.docs.map(d=>d.data());R()}),
+  onSnapshot(query(collection(db,'requests'),where('to','==',u.uid)),q=>{rIn=q.docs.map(d=>({id:d.id,...d.data()}));R()}),
+  onSnapshot(query(collection(db,'requests'),where('from','==',u.uid)),q=>{rOut=q.docs.map(d=>({id:d.id,...d.data()}));R()}),
+  onSnapshot(query(collection(db,'users'),where('following','array-contains',u.uid)),q=>{nfol=q.docs.length;R()})];
+ tab='home';R()}
+function out(){subs.forEach(f=>f());subs=[];Object.values(unC).forEach(f=>f());unC={};openC={};if(unChat)unChat();me=null;prof={};signOut(auth)}
+
+/* ---------- posts ---------- */
+function shrink(f){return new Promise((ok,no)=>{const r=new FileReader();r.onerror=()=>no(new Error('Could not read the picture'));r.onload=()=>{const im=new Image();im.onerror=()=>no(new Error('Could not open the picture'));im.onload=()=>{let m=800,u;do{const sc=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*sc);c.height=Math.round(im.height*sc);c.getContext('2d').drawImage(im,0,0,c.width,c.height);u=c.toDataURL('image/jpeg',.7);m-=150}while(u.length>700000&&m>200);ok(u)};im.src=r.result};r.readAsDataURL(f)})}
+function cld(f){return new Promise((ok,no)=>{const x=new XMLHttpRequest(),fd=new FormData();fd.append('file',f);fd.append('upload_preset',CLOUD.preset);x.open('POST',`https://api.cloudinary.com/v1_1/${CLOUD.name}/auto/upload`);x.upload.onprogress=e=>{if(e.lengthComputable)load(Math.round(e.loaded/e.total*90),'Uploading video...')};x.onload=()=>{try{const j=JSON.parse(x.responseText);j.secure_url?ok(j.secure_url):no(new Error(j.error?j.error.message:'Upload failed'))}catch(e){no(new Error('Upload failed'))}};x.onerror=()=>no(new Error('Network error'));x.send(fd)})}
+async function newPost(){const t=$('pt').value.trim(),f=$('fl').files[0];if(!t)return alert('Write a caption');
+ const d={uid:me.uid,name:prof.name,type:$('ty').value,title:t,likes:[],ts:serverTimestamp()};
+ try{load(5,'Preparing...');if(f){if(f.type.startsWith('image/'))d.img=await shrink(f);else if(f.type.startsWith('video/')){if(!CLOUD.name)throw new Error('Videos need a free Cloudinary account (see setup). Pictures work now.');d.url=await cld(f)}else throw new Error('Choose a picture or video')}
+  load(96,'Saving...');await addDoc(collection(db,'posts'),d);tab='home'}catch(e){alert(e.message)}load(-1);RF()}
+const like=id=>{const p=posts.find(x=>x.id==id),h=(p.likes||[]).includes(me.uid);updateDoc(doc(db,'posts',id),{likes:h?arrayRemove(me.uid):arrayUnion(me.uid)})};
+function togC(id){if(openC[id]){delete openC[id];unC[id]&&unC[id]()}else{openC[id]=1;unC[id]=onSnapshot(query(collection(db,'posts',id,'comments'),orderBy('ts')),q=>{cmts[id]=q.docs.map(d=>d.data());R()})}RF()}
+function addC(id){const t=$('c'+id).value.trim();if(t){$('c'+id).value='';addDoc(collection(db,'posts',id,'comments'),{uid:me.uid,name:prof.name,t,ts:serverTimestamp()})}}
+async function share(id){const url=location.href.split('?')[0]+'?post='+id,t='Watch this on VEERB. Connect. Share. Inspire.';try{if(navigator.share)await navigator.share({title:'VEERB',text:t,url});else{await navigator.clipboard.writeText(t+' '+url);alert('Link copied. Paste it on WhatsApp, Facebook or Instagram.')}}catch(e){}}
+async function delPost(id){if(confirm('Delete this post?'))deleteDoc(doc(db,'posts',id))}
+
+/* ---------- people, requests, chat ---------- */
+const fids=()=>new Set(rIn.concat(rOut).filter(r=>r.status=='accepted').map(r=>r.from==me.uid?r.to:r.from));
+const reqSend=i=>{const u=users.find(x=>x.uid==i);setDoc(doc(db,'requests',me.uid+'_'+i),{from:me.uid,to:i,fromName:prof.name,toName:u?u.name:'',status:'pending',ts:serverTimestamp()})};
+const reqOk=id=>updateDoc(doc(db,'requests',id),{status:'accepted'}),reqNo=id=>deleteDoc(doc(db,'requests',id));
+const follow=(i,on)=>updateDoc(doc(db,'users',me.uid),{following:on?arrayUnion(i):arrayRemove(i)});
+const cid=i=>[me.uid,i].sort().join('_');
+function openChat(i){peer=users.find(x=>x.uid==i);if(unChat)unChat();msgs=[];unChat=onSnapshot(query(collection(db,'chats',cid(i),'messages'),orderBy('ts')),q=>{msgs=q.docs.map(d=>d.data());R()});tab='chat';RF()}
+function sendM(){const t=$('mt').value.trim();if(t){$('mt').value='';addDoc(collection(db,'chats',cid(peer.uid),'messages'),{from:me.uid,t,ts:serverTimestamp()})}}
+
+/* ---------- views ---------- */
+const av=n=>`<span class="av">${esc((n||'?')[0].toUpperCase())}</span>`;
+function card(p){const L=p.likes||[],mine=L.includes(me.uid),own=p.uid==me.uid,md=p.img?`<img class="mi" src="${p.img}">`:p.url?`<video src="${esc(p.url)}" controls playsinline></video>`:'';
+ const cb=openC[p.id]?`<div class="tx" style="margin-top:6px">${(cmts[p.id]||[]).map(c=>`<div><b>${esc(c.name)}</b> ${esc(c.t)}</div>`).join('')}<div style="display:flex;gap:8px;margin:8px 0"><input id="c${p.id}" placeholder="Add a comment..." style="margin:0"><button onclick="addC('${p.id}')">Post</button></div></div>`:'';
+ return `<div class="po"><div class="ph">${av(p.name)}<b>${esc(p.name)}</b><span class="tag">${TY[p.type]||''}</span>${own?`<span onclick="delPost('${p.id}')" style="color:var(--mu)">🗑</span>`:''}</div>${md}<div><button class="ib" onclick="like('${p.id}')">${mine?'❤️':'🤍'}</button><button class="ib" onclick="togC('${p.id}')">💬</button><button class="ib" onclick="share('${p.id}')">↪</button></div><div class="tx"><b>${L.length} likes</b></div><div class="tx"><b>${esc(p.name)}</b> ${esc(p.title)}</div>${cb}</div>`}
+function authView(){return `<div style="min-height:100vh;background:radial-gradient(ellipse at 50% 26%,#111c52,#050a1f 62%);text-align:center;padding:50px 24px 30px"><div style="display:flex;justify-content:center">${LG(110)}</div><div style="font-size:44px;font-weight:800;letter-spacing:12px;padding-left:12px">VEERB</div><div class="logo" style="font-size:18px;letter-spacing:0">Connect. Share. Inspire.</div><div style="font-size:26px;font-weight:700;margin:26px 0 6px">Welcome to Veerb</div><div class="mu" style="margin-bottom:20px">Your social world. Your way.</div><button class="g" style="width:100%;padding:15px;font-size:17px" onclick="google()">Continue with Google</button><div class="mu" style="margin:14px 0 2px">or use email</div><input id="em" type="email" placeholder="Email" autocapitalize="none"><input id="pw" type="password" placeholder="Password (6+ characters)"><div style="display:flex;gap:8px;margin-top:10px"><button style="flex:1" onclick="emailGo(true)">Sign up</button><button class="s" style="flex:1" onclick="emailGo(false)">Log in</button></div></div>`}
+function render(){const A=$('app'),N=$('nav');
+ if(!me){N.style.display='none';A.innerHTML=authView();return}
+ N.style.display='flex';N.innerHTML=[['home','🏠'],['ppl','👥'],['up','➕'],['chats','✉️'],['me','👤']].map(t=>`<button class="${tab==t[0]||(tab=='chat'&&t[0]=='chats')?'on':''}" onclick="go('${t[0]}')">${t[1]}${t[0]=='ppl'&&rIn.filter(r=>r.status=='pending').length?'<sup style="color:#ff3040"> '+rIn.filter(r=>r.status=='pending').length+'</sup>':''}</button>`).join('');
+ let h='';const F=fids(),top=t=>`<div class="top"><b style="flex:1">${t}</b></div>`;
+ if(tab=='home'){h=`<div class="top"><span style="display:flex;gap:8px;align-items:center;flex:1">${LG(28)}<span class="logo">VEERB</span></span></div>`;let l=posts.slice();if(FOC){const f=l.find(x=>x.id==FOC);if(f){h+='<div class="note" style="margin:8px 12px">🔗 Opened from a shared link</div>';l=[f].concat(l.filter(x=>x!=f))}}h+=l.length?l.map(card).join(''):'<div class="pad mu">No posts yet. Tap ➕ to post the first one.</div>'}
+ if(tab=='up')h=top('New post')+`<div class="pad"><select id="ty"><option value="pic">Picture</option><option value="video">Reel / Video</option><option value="movie">Movie</option><option value="drama">Drama / Serial</option></select><input id="fl" type="file" accept="image/*,video/*"><input id="pt" placeholder="Write a caption..."><button class="g" style="width:100%;margin-top:12px;padding:13px" onclick="newPost()">Share</button><div class="note">Pictures are stored in your free Firebase. Videos need the free Cloudinary setup.</div></div>`;
+ if(tab=='ppl'){const inc=rIn.filter(r=>r.status=='pending');h=top('Friends')+(inc.length?'<div class="pad mu"><b>Friend requests</b></div>'+inc.map(r=>`<div class="li">${av(r.fromName)}<span class="g"><b>${esc(r.fromName)}</b></span><button onclick="reqOk('${r.id}')">Accept</button><button class="s" onclick="reqNo('${r.id}')">Delete</button></div>`).join(''):'')+'<div class="pad mu"><b>People on VEERB</b></div>'+(users.filter(u=>u.uid!=me.uid).map(u=>{const fo=(prof.following||[]).includes(u.uid),sent=rOut.find(r=>r.to==u.uid),isF=F.has(u.uid);return `<div class="li">${av(u.name)}<span class="g"><b>${esc(u.name)}</b></span><button class="s" onclick="follow('${u.uid}',${!fo})">${fo?'Following':'Follow'}</button>${isF?'<span class="mu">✔ Friends</span>':sent?'<span class="mu">Requested</span>':`<button onclick="reqSend('${u.uid}')">Add friend</button>`}</div>`}).join('')||'<div class="pad mu">No one else has joined yet. Share your link!</div>')}
+ if(tab=='chats')h=top('Inbox')+([...F].map(i=>users.find(u=>u.uid==i)).filter(Boolean).map(u=>`<div class="li" onclick="openChat('${u.uid}')">${av(u.name)}<span class="g"><b>${esc(u.name)}</b><br><span class="mu">Tap to chat</span></span></div>`).join('')||'<div class="pad mu">Add friends to start chatting.</div>');
+ if(tab=='chat'&&peer)h=`<div class="top"><span onclick="go('chats')" style="font-size:22px">‹</span><b>${esc(peer.name)}</b></div><div class="pad">${msgs.map(m=>`<div class="msg ${m.from==me.uid?'me':''}">${esc(m.t)}</div>`).join('')||'<div class="mu">Say hi 👋</div>'}<div style="display:flex;gap:8px;margin-top:12px"><input id="mt" placeholder="Message..." style="margin:0"><button onclick="sendM()">Send</button></div></div>`;
+ if(tab=='me'){const mp=posts.filter(p=>p.uid==me.uid),pc=Math.min(100,nfol/NEED*100);h=top(esc(prof.name))+`<div class="pad"><div style="display:flex;align-items:center;gap:14px"><span class="av" style="width:72px;height:72px;font-size:30px">${esc((prof.name||'?')[0].toUpperCase())}</span><span style="flex:1;display:flex;justify-content:space-around;text-align:center"><span><b>${mp.length}</b><br><span class="mu">posts</span></span><span><b>${nfol}</b><br><span class="mu">followers</span></span><span><b>${F.size}</b><br><span class="mu">friends</span></span></span></div><div class="mu" style="margin-top:10px">${esc(prof.email||'')}</div><div class="note"><b>Monetization</b><div class="bar" style="margin:8px 0"><i style="width:${pc}%"></i></div>${nfol} / ${NEED} followers. Ad earnings will start after ads are approved.</div><button class="s" onclick="out()">Log out</button></div>`+(mp.length?mp.map(card).join(''):'')}
+ A.innerHTML=h}
+window.go=t=>{tab=t;RF()};
+Object.assign(window,{google,emailGo,newPost,like,togC,addC,share,delPost,reqSend,reqOk,reqNo,follow,openChat,sendM,out});
+
+if(CFG.apiKey.startsWith('PASTE')){$('app').innerHTML='<div class="pad"><h2>Setup needed</h2><div class="note">Open index.html and paste your Firebase config at the top (CFG). See the setup steps.</div></div>'}
+else{const app=initializeApp(CFG);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,u=>{if(u)enter(u).catch(e=>alert(e.message));else{me=null;render()}})}
+</script>
+</body>
+</html>
